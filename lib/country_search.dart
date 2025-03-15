@@ -81,6 +81,7 @@ class _CountrySearchState extends State<CountrySearch> {
               ],
             ),
           ),
+          //Check if country exist
           if (errorMessage.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 20),
@@ -95,6 +96,7 @@ class _CountrySearchState extends State<CountrySearch> {
               ),
             ),
           Expanded(
+            //ListView coz there couple countries with the same name (India, America, China etc)
             child: ListView.separated(
               padding: EdgeInsets.all(16),
               itemCount: countries.length,
