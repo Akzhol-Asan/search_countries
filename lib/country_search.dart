@@ -15,6 +15,7 @@ class _CountrySearchState extends State<CountrySearch> {
   TextEditingController search = TextEditingController();
   String errorMessage = '';
   bool isFetching = false;
+  String? fetchError;
 
   Future<void> fetchData(String countryName) async {
     if (countryName.isEmpty) return;
@@ -23,44 +24,49 @@ class _CountrySearchState extends State<CountrySearch> {
       isFetching = true;
       errorMessage = '';
     });
+    try {
+      final uri = Uri.parse('https://restcountries.com/v3.1/name/$countryName');
+      final countriesResponse = await get(uri);
 
-    final uri = Uri.parse('https://restcountries.com/v3.1/name/$countryName');
-    final response = await get(uri);
-
-    setState(() {
-      isFetching = false;
-    });
-
-    if (response.statusCode == 200) {
-      final List<dynamic> jsonData = jsonDecode(response.body);
-      final newCountry =
-          jsonData
-              .map(
-                (json) => CountryListItem(
-                  country: json['name']['common'],
-                  capital:
-                      (json['capital'] as List).isNotEmpty
-                          ? json['capital'][0]
-                          : 'Unknown',
-                  region: json['region'],
-                  area: json['area'].toDouble(),
-                  population: json['population'],
-                  flag: json['flag'],
-                ),
-              )
-              .toList();
       setState(() {
-        countries = newCountry;
-        errorMessage = '';
+        isFetching = false;
       });
-    } else if (response.statusCode == 404) {
+
+      if (countriesResponse.statusCode == 200) {
+        final List<dynamic> jsonData = jsonDecode(countriesResponse.body);
+        final newCountry =
+            jsonData
+                .map(
+                  (json) => CountryListItem(
+                    country: json['name']['common'],
+                    capital:
+                        (json['capital'] as List).isNotEmpty
+                            ? json['capital'][0]
+                            : 'Unknown',
+                    region: json['region'],
+                    area: json['area'].toDouble(),
+                    population: json['population'],
+                    flag: json['flag'],
+                  ),
+                )
+                .toList();
+        setState(() {
+          countries = newCountry;
+          errorMessage = '';
+        });
+      } else if (countriesResponse.statusCode == 404) {
+        setState(() {
+          countries = [];
+          errorMessage =
+              'Could not found - $countryName\ntry another country :)';
+        });
+      } else {
+        throw Exception('Response code: ${countriesResponse.statusCode}');
+      }
+    } catch (error) {
       setState(() {
-        countries = [];
-        errorMessage = 'Could not found this country';
-      });
-    } else {
-      setState(() {
-        errorMessage = 'unknown error: ${response.statusCode}';
+        fetchError = 'Response code: 404';
+        isFetching = false;
       });
     }
   }
@@ -69,135 +75,143 @@ class _CountrySearchState extends State<CountrySearch> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    Widget content;
+    if (isFetching) {
+      content = Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: LinearProgressIndicator(),
+        ),
+      );
+    } else if (fetchError != null) {
+      content = Center(child: Text(fetchError!, textAlign: TextAlign.center));
+    } else {
+      content = Column(
+        children: [
+          //Input country name & button
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: search,
+                    decoration: InputDecoration(labelText: 'Enter country'),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    fetchData(search.text.trim());
+                  },
+                  icon: Icon(Icons.search),
+                ),
+              ],
+            ),
+          ),
+          //Check if country exist
+          if (errorMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Center(
+                child: Text(
+                  textAlign: TextAlign.center,
+                  errorMessage,
+                  style: theme.textTheme.bodyLarge!.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            //ListView coz there couple countries with the same name (India, America, China etc)
+            child: ListView.separated(
+              padding: EdgeInsets.all(16),
+              itemCount: countries.length,
+              separatorBuilder: (ctx, index) => Divider(),
+              itemBuilder:
+                  (ctx, index) => Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('Country:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].country,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Text('Capital:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].capital,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Text('Region:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].region,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Text('Area:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].area.toString(),
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Text('Population:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].population.toString(),
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Text('Flag:'),
+                          SizedBox(width: 5),
+                          Text(
+                            countries[index].flag,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Text('Borders:', style: theme.textTheme.titleMedium),
+                      Text('-'),
+                    ],
+                  ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Center(child: Text('Search Countries'))),
-      body:
-          isFetching
-              ? Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: LinearProgressIndicator(),
-                ),
-              )
-              : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: search,
-                            decoration: InputDecoration(
-                              labelText: 'Enter country',
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            fetchData(search.text.trim());
-                          },
-                          icon: Icon(Icons.search),
-                        ),
-                      ],
-                    ),
-                  ),
-                  //Check if country exist
-                  if (errorMessage.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: Center(
-                        child: Text(
-                          textAlign: TextAlign.center,
-                          '404 country not found!\ntry again :)',
-                          style: theme.textTheme.bodyLarge!.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    //ListView coz there couple countries with the same name (India, America, China etc)
-                    child: ListView.separated(
-                      padding: EdgeInsets.all(16),
-                      itemCount: countries.length,
-                      separatorBuilder: (ctx, index) => Divider(),
-                      itemBuilder:
-                          (ctx, index) => Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text('Country:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].country,
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  Text('Capital:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].capital,
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  Text('Region:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].region,
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  Text('Area:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].area.toString(),
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  Text('Population:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].population.toString(),
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  Text('Flag:'),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    countries[index].flag,
-                                    style: theme.textTheme.titleMedium,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                    ),
-                  ),
-                ],
-              ),
+      body: content,
     );
   }
 }
