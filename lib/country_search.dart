@@ -85,7 +85,6 @@ class _CountrySearchState extends State<CountrySearch> {
           countries = [];
           errorMessage =
               'Could not found - $countryName\nTry another country :)';
-          fetchError = 'Response code: 404';
           isFetching = false;
         });
       } else {
