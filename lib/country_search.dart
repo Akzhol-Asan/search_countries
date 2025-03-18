@@ -17,59 +17,83 @@ class _CountrySearchState extends State<CountrySearch> {
   bool isFetching = false;
   String? fetchError;
 
+  Future<List<String>> borderCountries(List<String> countryCodes) async {
+    if (countryCodes.isEmpty) return [];
+
+    List<String> borderNames = [];
+
+    for (String code in countryCodes) {
+      try {
+        final uri = Uri.parse('https://restcountries.com/v3.1/alpha/$code');
+        final response = await get(uri);
+
+        if (response.statusCode == 200) {
+          final List<dynamic> jsonData = jsonDecode(response.body);
+          borderNames.add(jsonData.first['name']['common']);
+        }
+      } catch (e) {
+        borderNames.add(code);
+      }
+    }
+
+    return borderNames;
+  }
+
   Future<void> fetchData(String countryName) async {
     if (countryName.isEmpty) return;
 
     setState(() {
       isFetching = true;
       errorMessage = '';
+      fetchError = null;
     });
+
     try {
       final uri = Uri.parse('https://restcountries.com/v3.1/name/$countryName');
       final countriesResponse = await get(uri);
 
-      setState(() {
-        isFetching = false;
-      });
-
       if (countriesResponse.statusCode == 200) {
         final List<dynamic> jsonData = jsonDecode(countriesResponse.body);
-        final newCountry =
-            jsonData
-                .map(
-                  (json) => CountryListItem(
-                    country: json['name']['common'],
-                    capital:
-                        (json['capital'] as List).isNotEmpty
-                            ? json['capital'][0]
-                            : 'Unknown',
-                    region: json['region'],
-                    area: json['area'].toDouble(),
-                    population: json['population'],
-                    flag: json['flag'],
-                    borders:
-                        (json['borders'] != null)
-                            ? List<String>.from(json['borders'])
-                            : [],
-                  ),
-                )
-                .toList();
+        final List<CountryListItem> newCountry = await Future.wait(
+          jsonData.map<Future<CountryListItem>>((json) async {
+            List<String> borderCodes =
+                (json['borders'] as List?)?.cast<String>() ?? [];
+            List<String> borderNames = await borderCountries(borderCodes);
+
+            return CountryListItem(
+              country: json['name']['common'],
+              capital:
+                  (json['capital'] as List?)?.isNotEmpty == true
+                      ? json['capital'][0]
+                      : 'Unknown',
+              region: json['region'],
+              area: json['area'].toDouble(),
+              population: json['population'],
+              flag: json['flag'],
+              borders: borderNames,
+            );
+          }),
+        );
+
         setState(() {
           countries = newCountry;
           errorMessage = '';
+          isFetching = false;
         });
       } else if (countriesResponse.statusCode == 404) {
         setState(() {
           countries = [];
           errorMessage =
-              'Could not found - $countryName\ntry another country :)';
+              'Could not found - $countryName\nTry another country :)';
+          fetchError = 'Response code: 404';
+          isFetching = false;
         });
       } else {
         throw Exception('Response code: ${countriesResponse.statusCode}');
       }
     } catch (error) {
       setState(() {
-        fetchError = 'Response code: 404';
+        fetchError = 'Response error: ${error.toString()}';
         isFetching = false;
       });
     }
@@ -205,21 +229,18 @@ class _CountrySearchState extends State<CountrySearch> {
                       SizedBox(height: 10),
                       if (countries[index].borders.isNotEmpty)
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Borders:'),
                             SizedBox(width: 5),
                             Expanded(
                               child: Text(
-                                countries[index].borders.join(
-                                  ', ',
-                                ), // Вывод границ через запятую
+                                countries[index].borders.join(', '),
                                 style: theme.textTheme.bodyMedium,
                               ),
                             ),
                           ],
                         ),
-                      // Text('Borders:', style: theme.textTheme.titleMedium),
-                      // Text('-'),
                     ],
                   ),
             ),
