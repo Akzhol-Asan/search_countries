@@ -5,6 +5,7 @@ class CountryListItem {
   final double area;
   final int population;
   final String flag;
+  final List<String> borders;
 
   CountryListItem({
     required this.country,
@@ -13,5 +14,6 @@ class CountryListItem {
     required this.area,
     required this.population,
     required this.flag,
+    required this.borders,
   });
 }

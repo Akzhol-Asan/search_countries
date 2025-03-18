@@ -47,6 +47,10 @@ class _CountrySearchState extends State<CountrySearch> {
                     area: json['area'].toDouble(),
                     population: json['population'],
                     flag: json['flag'],
+                    borders:
+                        (json['borders'] != null)
+                            ? List<String>.from(json['borders'])
+                            : [],
                   ),
                 )
                 .toList();
@@ -199,8 +203,23 @@ class _CountrySearchState extends State<CountrySearch> {
                         ],
                       ),
                       SizedBox(height: 10),
-                      Text('Borders:', style: theme.textTheme.titleMedium),
-                      Text('-'),
+                      if (countries[index].borders.isNotEmpty)
+                        Row(
+                          children: [
+                            Text('Borders:'),
+                            SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                countries[index].borders.join(
+                                  ', ',
+                                ), // Вывод границ через запятую
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      // Text('Borders:', style: theme.textTheme.titleMedium),
+                      // Text('-'),
                     ],
                   ),
             ),
